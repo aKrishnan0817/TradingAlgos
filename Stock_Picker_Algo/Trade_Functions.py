@@ -1,28 +1,45 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[122]:
 
 
 import pandas as pd
 import pandas_market_calendars as mcal
 import datetime
 import yfinance as yf
+import pickle
 
 
-# In[ ]:
+# In[134]:
+
+
+with open('joinedData.pkl', 'rb') as file:
+    data = pickle.load(file)
+
+
+# In[124]:
+
+
+def getDate(date):
+    #date needs to be a string like 2024-01-01
+    dateList= date.split('-')
+    return datetime.date(int(dateList[0]),int(dateList[1]),int(dateList[2]) )
+
+
+# In[125]:
 
 
 def get_calendar():
     nyse = mcal.get_calendar('NYSE')
-    a = nyse.valid_days(start_date='2024-01-01', end_date='2024-11-08')
+    a = nyse.valid_days(start_date='2019-01-01', end_date='2024-11-08')
     cal =[]
     for x in a:
         cal.append(datetime.datetime.strftime(x,'%Y-%m-%d'))
     return cal
 
 
-# In[11]:
+# In[126]:
 
 
 def get_NDXmembers(file="Nasdaq100MembersJan2024.csv"):
@@ -36,7 +53,7 @@ def get_NDXmembers(file="Nasdaq100MembersJan2024.csv"):
     
 
 
-# In[47]:
+# In[127]:
 
 
 def get_SortedPctChange(InputDate, TimeInput=5,NDXfile="Nasdaq100MembersJan2024.csv"):
@@ -47,18 +64,19 @@ def get_SortedPctChange(InputDate, TimeInput=5,NDXfile="Nasdaq100MembersJan2024.
     startDate = cal[cal.index(InputDate)-TimeInput]
     
     for ticker in NDX_members:
-        
-        #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
-        data = (yf.download(ticker, start=startDate, end=InputDate,multi_level_index=False)).reset_index()
-        
-        #Get the Close Values
-        CloseVals=data["Close"].values
-        
-        #Calculaute the percent change in Close Price from RunDate and RunDate-TimeInput
-        pctChange = (CloseVals[-1]-CloseVals[0])/CloseVals[0]
-        
-        PctChangeList['Ticker'].append(ticker)
-        PctChangeList['PctChange'].append(pctChange)
+        try:
+            #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
+            #Get the Close Values
+            endPrice = data.loc[getDate(InputDate),ticker]["Close"]
+            startPrice = data.loc[getDate(startDate),ticker]["Close"]
+
+            #Calculaute the percent change in Close Price from RunDate and RunDate-TimeInput
+            pctChange = (endPrice-startPrice)/startPrice
+
+            PctChangeList['Ticker'].append(ticker)
+            PctChangeList['PctChange'].append(pctChange)
+        except:
+            print("UNABLE TO FIND:---",ticker,"----")
         
     #Convert to dataframe and sort it 
     dfChange = (pd.DataFrame(PctChangeList).sort_values('PctChange',ascending=False)).reset_index(drop=True)
@@ -66,31 +84,38 @@ def get_SortedPctChange(InputDate, TimeInput=5,NDXfile="Nasdaq100MembersJan2024.
     return dfChange
 
 
-# In[ ]:
+# In[128]:
+
+
+#get_SortedPctChange('2024-05-03')
+
+
+# In[144]:
 
 
 def getLongReturns(RunDate,LongStockList,holdTime=1):
     LongReturnList = list()
     cal = get_calendar()
     
-    for ticker in LongStockList:
-        
-        endDate = cal[cal.index(RunDate)+holdTime]
+    for ticker in LongStockList:  
+        try:
+            endDate = cal[cal.index(RunDate)+holdTime]
 
-        #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
-        data = (yf.download(ticker, start=RunDate, end=endDate,multi_level_index=False)).reset_index()
+            #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
+            endPrice = data.loc[getDate(endDate),ticker]["Close"]
+            startPrice = data.loc[getDate(RunDate),ticker]["Close"]
+            #print(endPrice,startPrice)
+
+            #Calculate and Append Return
+            Return = (endPrice-startPrice)/startPrice
+            LongReturnList.append(Return)
+        except:
+            print("UNABLE TO FIND:---",ticker,"----")
         
-        #Get the Close and Open Values
-        ClosePrice=data["Close"].values
-        OpenPrice = data['Open'].values
-        
-        #Calculate and Append Return
-        Return = (ClosePrice[-1]-OpenPrice[0])/OpenPrice[0]
-        LongReturnList.append(Return)
     return LongReturnList
 
 
-# In[ ]:
+# In[145]:
 
 
 def getShortReturns(RunDate,ShortStockList,holdTime=1):
@@ -98,19 +123,21 @@ def getShortReturns(RunDate,ShortStockList,holdTime=1):
     cal = get_calendar()
     
     for ticker in ShortStockList:
-        
-        endDate = cal[cal.index(RunDate)+holdTime]
+        try:
+            endDate = cal[cal.index(RunDate)+holdTime]
 
-        #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
-        data = (yf.download(ticker, start=RunDate, end=endDate,multi_level_index=False)).reset_index()
-        
-        #Get the Close and Open Values
-        ClosePrice=data["Close"].values
-        OpenPrice = data['Open'].values
-        
-        #Calculate and Append Return
-        Return = -(ClosePrice[-1]-OpenPrice[0])/OpenPrice[0]
-        ShortReturnList.append(Return)
+            #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
+
+            endPrice = data.loc[getDate(endDate),ticker]["Close"]
+            startPrice = data.loc[getDate(RunDate),ticker]["Close"]
+
+
+            #Calculate and Append Return
+            Return = -(endPrice-startPrice)/startPrice
+            ShortReturnList.append(Return)
+        except:
+            print("UNABLE TO FIND:---",ticker,"----")
+
     return ShortReturnList
 
 
