@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/atulkrishnan/Desktop/TradingAlgos/Variance_Algo/mlruns/658072455368796720/817d65b2dd7440b5adcf7a77d664c65b/artifacts
+end_time: 1731536933947
+entry_point_name: ''
+experiment_id: '658072455368796720'
+lifecycle_stage: active
+run_id: 817d65b2dd7440b5adcf7a77d664c65b
+run_name: bemused-newt-764
+run_uuid: 817d65b2dd7440b5adcf7a77d664c65b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1731536912349
+status: 3
+tags: []
+user_id: atulkrishnan

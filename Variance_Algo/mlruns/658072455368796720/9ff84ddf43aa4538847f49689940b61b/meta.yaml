@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/atulkrishnan/Desktop/TradingAlgos/Variance_Algo/mlruns/658072455368796720/9ff84ddf43aa4538847f49689940b61b/artifacts
+end_time: 1731538207318
+entry_point_name: ''
+experiment_id: '658072455368796720'
+lifecycle_stage: active
+run_id: 9ff84ddf43aa4538847f49689940b61b
+run_name: Model 51
+run_uuid: 9ff84ddf43aa4538847f49689940b61b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1731538182395
+status: 3
+tags: []
+user_id: atulkrishnan

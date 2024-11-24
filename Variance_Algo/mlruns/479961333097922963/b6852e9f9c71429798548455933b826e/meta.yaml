@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/atulkrishnan/Desktop/TradingAlgos/Variance_Algo/mlruns/479961333097922963/b6852e9f9c71429798548455933b826e/artifacts
+end_time: 1731532061057
+entry_point_name: ''
+experiment_id: '479961333097922963'
+lifecycle_stage: active
+run_id: b6852e9f9c71429798548455933b826e
+run_name: gaudy-flea-865
+run_uuid: b6852e9f9c71429798548455933b826e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1731532059133
+status: 3
+tags: []
+user_id: atulkrishnan
