@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/atulkrishnan/Desktop/TradingAlgos/Stock_Picker_Algo/mlruns/734871490495703065/bff2443dc3f14349aedb5a4c9a6da612/artifacts
+end_time: 1732509310336
+entry_point_name: ''
+experiment_id: '734871490495703065'
+lifecycle_stage: active
+run_id: bff2443dc3f14349aedb5a4c9a6da612
+run_name: Expirement 71
+run_uuid: bff2443dc3f14349aedb5a4c9a6da612
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1732509306818
+status: 3
+tags: []
+user_id: atulkrishnan

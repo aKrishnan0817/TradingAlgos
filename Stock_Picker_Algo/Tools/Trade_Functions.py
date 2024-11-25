@@ -110,7 +110,7 @@ def getMomentum(date,ticker,debug=False):
         print(f"A:{a}\nB:{b}\nC:{c}\nD:{d}\n")
         print(f"Delta_1:{delta_1}\nDelta_2:{delta_2}\nMomentum:{momentum}")
     #return momentum
-    
+
     return d/c
 
 
@@ -118,53 +118,53 @@ def getMomentum(date,ticker,debug=False):
 
 
 def get_SortedPctChange(InputDate, TimeInput=5,debug=False):
-    
+
     NDX_members = get_NDXmembers(getDate(InputDate).year)
     PctChangeList = {"Ticker":[],"PctChange":[]}
     startDate = getDateOffset(InputDate,-TimeInput)
     endDate = getDateOffset(InputDate,-1)
     for ticker in NDX_members:
-        try:     
+        try:
             pctChange = getPctChange(ticker,startDate,endDate)
             PctChangeList['Ticker'].append(ticker)
             PctChangeList['PctChange'].append(pctChange)
-            
+
             if debug:
                 print("---",ticker,"----")
                 print(f"Percent Change: {pctChange}")
         except:
             print("UNABLE TO FIND:---",ticker,"----")
-        
-    #Convert to dataframe and sort it 
+
+    #Convert to dataframe and sort it
     dfChange = (pd.DataFrame(PctChangeList).sort_values('PctChange',ascending=False)).reset_index(drop=True)
-    
+
     return dfChange
 
 
 # In[ ]:
 
 
-def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False):
+def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01):
     ShortReturnList = list()
     endDate = getDateOffset(RunDate,holdTime)
     for ticker in ShortStockList:
         try:
-            
+
 
             #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
             endPrice = getPrice(endDate,ticker,"Close")
             startPrice = getPrice(RunDate,ticker,"Open")
-            
-            #Checking For Stop Loss
-            endLowPrice= getPrice(endDate,ticker,"Low")
-            if -(endLowPrice-startPrice)/startPrice <= stopLoss: 
-                LongReturnList.append(stopLoss)
-                pass
-            
-            #Calculate and Append Return
+            endHighPrice= getPrice(endDate,ticker,"High")
+
             Return = -(endPrice-startPrice)/startPrice
+            #Checking For Stop Loss
+
+            if -(endHighPrice-startPrice)/startPrice <= stopLoss:
+                Return = stopLoss
+
+            #Calculate and Append Return
             ShortReturnList.append(Return)
-            
+
             if debug:
                 print("---",ticker,"----")
 
@@ -172,9 +172,9 @@ def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False):
                 print(f"End Date:{endDate} , End Price:{endPrice} ")
                 print(f"Return:{Return}")
                 print("")
-            
+
         except:
-            print("UNABLE TO FIND:---",ticker,"---")
+            print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---")
 
     return ShortReturnList
 
@@ -185,24 +185,25 @@ def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False):
 def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=False):
     LongReturnList = list()
     endDate = getDateOffset(RunDate,holdTime)
-    
-    for ticker in LongStockList:  
+
+    for ticker in LongStockList:
         try:
             #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
             endPrice = getPrice(endDate,ticker,"Close")
             startPrice = getPrice(RunDate,ticker,"Open")
-            
             #Checking For Stop Loss
             endLowPrice= getPrice(endDate,ticker,"Low")
-            if (endLowPrice-startPrice)/startPrice <= stopLoss: 
-                LongReturnList.append(stopLoss)
-                pass
-            
-            #Calculate and Append Return
             Return = (endPrice-startPrice)/startPrice
+
+            if (endLowPrice-startPrice)/startPrice <= stopLoss:
+                Return = stopLoss
+
+
+            #Calculate and Append Return
+
             LongReturnList.append(Return)
-            
-            
+
+
             if debug:
                 print("---",ticker,"----")
                 print(f"Start Date:{RunDate} , Start Price:{startPrice} ")
@@ -210,11 +211,26 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
                 print(f"Return:{Return}")
                 print("")
 
-            
+
         except:
-            print("UNABLE TO FIND:---",ticker,"--")
-        
+            print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--")
+
     return LongReturnList
+
+def pick_trade(RunDate,NumStocks,stopLoss=-0.01,holdTime=0,TimeInput=5,debug=False):
+    #Calculate pct change
+    PctChange = get_SortedPctChange(RunDate,TimeInput,debug=debug)
+
+    #select first N stocks and caculate percent retruns
+    LongStockList = PctChange["Ticker"].iloc[:NumStocks]
+    LongReturns = getLongReturns(RunDate,LongStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug)
+
+    #select bottom N stocks and caculate percent retruns
+    ShortStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-NumStocks:]
+    ShortReturns = getShortReturns(RunDate,ShortStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug)
+    TotalReturn = sum(LongReturns) / NumStocks + sum(ShortReturns) / NumStocks
+   # print(f"Date:{RunDate}, Long Stocks:{list(LongStockList)}, Short Stocks:{list(ShortStockList)}, Return:{TotalReturn}\n")
+    return TotalReturn
 
 
 # In[ ]:
@@ -243,7 +259,3 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
 
 
 # In[ ]:
-
-
-
-
