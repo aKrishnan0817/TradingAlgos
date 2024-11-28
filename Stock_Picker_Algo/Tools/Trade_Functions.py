@@ -133,7 +133,8 @@ def get_SortedPctChange(InputDate, TimeInput=5,debug=False):
                 print("---",ticker,"----")
                 print(f"Percent Change: {pctChange}")
         except:
-            print("UNABLE TO FIND:---",ticker,"----")
+            i=1
+            #print("UNABLE TO FIND:---",ticker,"----")
 
     #Convert to dataframe and sort it
     dfChange = (pd.DataFrame(PctChangeList).sort_values('PctChange',ascending=False)).reset_index(drop=True)
@@ -154,12 +155,12 @@ def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01
             #Get the data based on the provided ticker, RunDate, and startDate(being runDate-Timeinput)
             endPrice = getPrice(endDate,ticker,"Close")
             startPrice = getPrice(RunDate,ticker,"Open")
-            endHighPrice= getPrice(endDate,ticker,"High")
+            runHighPrice= getPrice(RunDate,ticker,"High")
 
             Return = -(endPrice-startPrice)/startPrice
             #Checking For Stop Loss
 
-            if -(endHighPrice-startPrice)/startPrice <= stopLoss:
+            if -(runHighPrice-startPrice)/startPrice <= stopLoss:
                 Return = stopLoss
 
             #Calculate and Append Return
@@ -174,7 +175,10 @@ def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01
                 print("")
 
         except:
-            print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---")
+
+            print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---",endDate)
+           
+
 
     return ShortReturnList
 
@@ -192,10 +196,10 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
             endPrice = getPrice(endDate,ticker,"Close")
             startPrice = getPrice(RunDate,ticker,"Open")
             #Checking For Stop Loss
-            endLowPrice= getPrice(endDate,ticker,"Low")
+            runLowPrice= getPrice(endDate,ticker,"Low")
             Return = (endPrice-startPrice)/startPrice
 
-            if (endLowPrice-startPrice)/startPrice <= stopLoss:
+            if (runLowPrice-startPrice)/startPrice <= stopLoss:
                 Return = stopLoss
 
 
@@ -213,9 +217,13 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
 
 
         except:
-            print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--")
+            print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--",endDate)
+           
 
     return LongReturnList
+
+
+
 
 def pick_trade(RunDate,NumStocks,stopLoss=-0.01,holdTime=0,TimeInput=5,debug=False):
     #Calculate pct change
