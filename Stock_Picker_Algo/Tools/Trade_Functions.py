@@ -164,7 +164,8 @@ def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01
                 Return = stopLoss
 
             #Calculate and Append Return
-            ShortReturnList.append(Return)
+            #-0.0004 to account for commisions
+            ShortReturnList.append(Return-0.0004)
 
             if debug:
                 print("---",ticker,"----")
@@ -204,8 +205,8 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
 
 
             #Calculate and Append Return
-
-            LongReturnList.append(Return)
+            #-0.0004 to account for commisions
+            LongReturnList.append(Return-0.0004)
 
 
             if debug:
