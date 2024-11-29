@@ -5,18 +5,19 @@
 
 
 import pandas as pd
+import numpy as np
 import pandas_market_calendars as mcal
 import datetime
 import yfinance as yf
 import pickle
 import os
+import matplotlib.pyplot as plt
 
 
 # In[ ]:
 
 
-os.chdir('../')
-
+print(os.getcwd())
 
 # In[ ]:
 
@@ -139,7 +140,8 @@ def get_SortedPctChange(InputDate, TimeInput=5,debug=False):
                 print("---",ticker,"----")
                 print(f"Percent Change: {pctChange}")
         except:
-            print("UNABLE TO FIND:---",ticker,"----")
+            i=1
+            #print("UNABLE TO FIND:---",ticker,"----")
         
     #Convert to dataframe and sort it 
     dfChange = (pd.DataFrame(PctChangeList).sort_values('PctChange',ascending=False)).reset_index(drop=True)
@@ -169,7 +171,8 @@ prices.index[3]
 # In[ ]:
 
 
-def getReturn_withStopLoss(runDate,endDate,ticker,holdTime,stopLoss,long_short):
+def getReturn_withStopLoss(runDate,endDate,ticker,holdTime,stopLoss,long_short,numDaysToCheckStopLoss):
+    
     s=1
     if long_short == "Long": 
         K = "Low"
@@ -179,17 +182,23 @@ def getReturn_withStopLoss(runDate,endDate,ticker,holdTime,stopLoss,long_short):
     prices = list(data.loc[runDate:endDate,ticker])
     price = data.loc[runDate:endDate,ticker]
     
-    for day in range(len(prices)):
-        if s*(prices[day][K] - prices[day]["Open"])/prices[day]["Open"] <= stopLoss:
+    putOnPrice= getPrice(runDate,ticker,"Open")
+    
+    if numDaysToCheckStopLoss > len(prices):
+        numDaysToCheckStopLoss =len(prices)
+    
+    for day in range(numDaysToCheckStopLoss):
+        if s*(prices[day][K] - putOnPrice)/putOnPrice <= stopLoss:
             Return = -0.0004 + stopLoss
             return Return , price.index[day],1
         try:
-            if s*(prices[day]["Close"]- prices[day+1]["Open"] )/prices[day]["Close"] <= stopLoss:
+            if s*(prices[day+1]["Open"]-putOnPrice)/putOnPrice <= stopLoss:
                 Return = -0.0004 + s*((prices[day+1]["Open"] - prices[0]["Open"])/prices[0]["Open"])
                 return Return ,price.index[day+1],1
         except:
-            Return = -0.0004 + s*((prices[-1]["Close"] - prices[0]["Open"])/prices[0]["Open"])
-            return Return ,price.index[-1],0
+            break
+    Return = -0.0004 + s*((prices[-1]["Close"] -putOnPrice)/putOnPrice)
+    return Return ,price.index[-1],0
    
 
 
@@ -203,7 +212,7 @@ def getReturn_withStopLoss(runDate,endDate,ticker,holdTime,stopLoss,long_short):
 # In[ ]:
 
 
-def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=False):
+def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=False,numDaysToCheckStopLoss=5):
     LongReturnList = list()
     endDate = getDateOffset(RunDate,holdTime)
     CloseDates=list()
@@ -211,16 +220,18 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
     for ticker in LongStockList:
         try:
             
-            Return,closeDate,stopLossFlag= getReturn_withStopLoss(RunDate,endDate,ticker,holdTime,stopLoss,long_short="Long")
+            Return,closeDate,stopLossFlag= getReturn_withStopLoss(RunDate,endDate,ticker,holdTime,stopLoss,long_short="Long",numDaysToCheckStopLoss=5)
             LongReturnList.append(Return)
             CloseDates.append(closeDate)
             stopLosses.append(stopLossFlag)
 
         except:
-            print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--",endDate)
+            #print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--",endDate)
             LongReturnList.append(-0.0004)
+            stopLosses.append(2)
+            CloseDates.append(endDate)
     x = len(LongStockList)
-    return pd.DataFrame({"Type":["Long"]*x, "ExecutionDate":[RunDate]*x, "CloseDate":CloseDates,"Returns":LongReturnList,"StopLoss":stopLosses})
+    return pd.DataFrame({"Stock": LongStockList,"Type":["Long"]*x, "ExecutionDate":[RunDate]*x,"CloseDate":CloseDates,"Returns":LongReturnList,"StopLoss":stopLosses})
 
 
 
@@ -228,7 +239,7 @@ def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=Fals
 # In[ ]:
 
 
-def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01):
+def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01,numDaysToCheckStopLoss=5):
     ShortReturnList = list()
     CloseDates=list()
     stopLosses= list()
@@ -236,21 +247,37 @@ def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01
     endDate = getDateOffset(RunDate,holdTime)
     for ticker in ShortStockList:
         try:
-            Return,trade,stopLossFlag = getReturn_withStopLoss(RunDate,endDate,ticker,holdTime,stopLoss,long_short="Short")
+            Return,trade,stopLossFlag = getReturn_withStopLoss(RunDate,endDate,ticker,holdTime,stopLoss,long_short="Short",numDaysToCheckStopLoss=5)
             CloseDates.append(trade)
             stopLosses.append(stopLossFlag)
             ShortReturnList.append(Return)
 
         except:
-            print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---",endDate)
+            #print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---",endDate)
             ShortReturnList.append(-0.0004)
+            stopLosses.append(2)
+            CloseDates.append(endDate)
            
 
     x = len(ShortStockList)
-    return pd.DataFrame({"Type":["Short"]*x,"ExecutionDate":[RunDate]*len(ShortStockList), "CloseDate":CloseDates,"Returns":ShortReturnList,"StopLoss":stopLosses})
+    return pd.DataFrame({"Stock": ShortStockList,"Type":["Short"]*x,"ExecutionDate":[RunDate]*len(ShortStockList), "CloseDate":CloseDates,"Returns":ShortReturnList,"StopLoss":stopLosses})
 
 
 # In[ ]:
+def pick_trade(TradeData,RunDate,NumStocks,stopLoss=-0.01,holdTime=0,TimeInput=5,debug=False,numDaysToCheckStopLoss=5):
+    #Calculate pct change
+    
+    PctChange = get_SortedPctChange(RunDate,TimeInput,debug=False)
+    
+    #select first N stocks and caculate percent retruns
+    LongStockList = PctChange["Ticker"].iloc[:NumStocks]
+    LongTradeInfo = getLongReturns(RunDate,LongStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
+    #select bottom N stocks and caculate percent retruns
+    ShortStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-NumStocks:]
+    ShortTradeInfo = getShortReturns(RunDate,ShortStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
+    TotalReturn = sum(LongTradeInfo["Returns"]) / NumStocks + sum(ShortTradeInfo["Returns"]) / NumStocks
+    
+    return TotalReturn, pd.concat([TradeData,LongTradeInfo,ShortTradeInfo])
 
 
 def calculate_mdd(return_vals):
@@ -326,6 +353,8 @@ def yearly_plots(returnDf):
             plt.grid(True, linestyle='--', alpha=0.6)
             
             # Save the plot
+            plt.tight_layout()
+
             plt.savefig(f"Visulizations/returns_{year}.png", dpi=300, bbox_inches='tight')
             plt.close()
 
