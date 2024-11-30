@@ -7,28 +7,114 @@ import numpy as np
 import mlflow
 import optuna
 
+def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=False,numDaysToCheckStopLoss=5):
+    LongReturnList = list()
+    endDate = getDateOffset(RunDate,holdTime)
+    CloseDates=list()
+    stopLosses= list()
+    for ticker in LongStockList:
+        try:
+            putOnPrice = getPrice(RunDate,ticker,"Open")
+            firstDayLow = getPrice(RunDate,ticker,"Low")
+
+            if (firstDayLow-putOnPrice)/putOnPrice <= stopLoss:
+                Return = stopLoss
+                closeDate=RunDate
+                stopLossFlag=1
+            else:
+                Return = (getPrice(endDate,ticker,"Close")-putOnPrice)/putOnPrice
+                closeDate=endDate
+                stopLossFlag=0
+
+            LongReturnList.append(Return-0.0004)
+            CloseDates.append(closeDate)
+            stopLosses.append(stopLossFlag)
+
+        except:
+            #print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--",endDate)
+            LongReturnList.append(-0.0004)
+            stopLosses.append(2)
+            CloseDates.append(endDate)
+    x = len(LongStockList)
+    return pd.DataFrame({"Stock": LongStockList,"Type":["Long"]*x, "ExecutionDate":[RunDate]*x,"CloseDate":CloseDates,"Returns":LongReturnList,"StopLoss":stopLosses})
+
+
+
+
+# In[ ]:
+
+
+def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01,numDaysToCheckStopLoss=5):
+    ShortReturnList = list()
+    CloseDates=list()
+    stopLosses= list()
+
+    endDate = getDateOffset(RunDate,holdTime)
+    for ticker in ShortStockList:
+        try:
+            putOnPrice = getPrice(RunDate,ticker,"Open")
+            firstDayHigh = getPrice(RunDate,ticker,"High")
+
+            if -(firstDayHigh-putOnPrice)/putOnPrice <= stopLoss:
+                Return = stopLoss
+                closeDate=RunDate
+                stopLossFlag=1
+            else:
+                Return = -(getPrice(endDate,ticker,"Close")-putOnPrice)/putOnPrice
+                closeDate=endDate
+                stopLossFlag=0
+
+            LongReturnList.append(Return-0.0004)
+            CloseDates.append(closeDate)
+            stopLosses.append(stopLossFlag)
+
+        except:
+            #print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---",endDate)
+            ShortReturnList.append(-0.0004)
+            stopLosses.append(2)
+            CloseDates.append(endDate)
+
+
+    x = len(ShortStockList)
+    return pd.DataFrame({"Stock": ShortStockList,"Type":["Short"]*x,"ExecutionDate":[RunDate]*len(ShortStockList), "CloseDate":CloseDates,"Returns":ShortReturnList,"StopLoss":stopLosses})
+
+def pick_trade(TradeData,RunDate,NumStocks,stopLoss=-0.01,holdTime=0,TimeInput=5,debug=False,numDaysToCheckStopLoss=5):
+    #Calculate pct change
+
+    PctChange = get_SortedPctChange(RunDate,TimeInput,debug=False)
+
+    #select first N stocks and caculate percent retruns
+    LongStockList = PctChange["Ticker"].iloc[:NumStocks]
+    LongTradeInfo = getLongReturns(RunDate,LongStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
+    #select bottom N stocks and caculate percent retruns
+    ShortStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-NumStocks:]
+    ShortTradeInfo = getShortReturns(RunDate,ShortStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
+    TotalReturn = sum(LongTradeInfo["Returns"]) / NumStocks + sum(ShortTradeInfo["Returns"]) / NumStocks
+
+    return TotalReturn, pd.concat([TradeData,LongTradeInfo,ShortTradeInfo])
+
 
 experiment_counter=0
-mlflow.set_experiment("Momentum Rider Tuning:V4")
+mlflow.set_experiment("Momentum Rider Tuning:V6")
 framedCal= get_calendar()
 
 
 def objective(trial):
     global experiment_counter
     expirement_name = f"Expirement {experiment_counter}"
-    
+
     with mlflow.start_run(run_name=expirement_name) as run:
         #Setup Paramter Variation
-        
+
         TimeInput = trial.suggest_int('TimeInput', 2, 7)
-        NumStocks= trial.suggest_int('NumStocks', 2, 15)
-        holdTime=trial.suggest_int('holdTime', 0, 8)
+        NumStocks= trial.suggest_int('NumStocks', 2, 10)
+        holdTime=trial.suggest_int('holdTime', 0, 7)
         stopLoss=trial.suggest_float('stopLoss',-0.05, -0.01)
         numDaysToCheckStopLoss= holdTime#trial.suggest_int('numDaysToCheckStopLoss', 1, holdTime)#must be less than holdtime
         TradeData=pd.DataFrame()
-        
-        
-        
+
+
+
         #Date Range
         cal=list()
         DateRange = [None,None]
@@ -40,7 +126,7 @@ def objective(trial):
             cal.append(framedCal[i])
         DateRange=[cal.index(DateRange[0]),cal.index(DateRange[1])]
         TotalReturnList=list()
-        
+
 
         #Run Algorithim
         for day in cal[DateRange[0]:DateRange[1]]:
@@ -68,7 +154,7 @@ def objective(trial):
 
         avg_loss= np.mean(returnDf["Return"][returnDf["Return"]<0])
         avg_prof= np.mean(returnDf["Return"][returnDf["Return"]>0])
-        
+
 
 
         #Saving A plot
@@ -90,22 +176,22 @@ def objective(trial):
         mlflow.log_param("stopLoss", trial.params['stopLoss'])
       #  mlflow.log_param("numDaysToCheckStopLoss", trial.params['numDaysToCheckStopLoss'])
 
-        
+
         mlflow.log_metric("CumulativeReturn", CumulativeReturn)
         mlflow.log_metric("SharpeRatio", SharpeRatio)
         mlflow.log_metric("Profit_Loss_Ratio", pLratio)
         mlflow.log_metric("avg_prof",avg_prof)
         mlflow.log_metric("avg_loss", avg_loss)
-        
+
         mlflow.log_metric("Max_Draw_Down",max_drawdown)
         mlflow.log_metric("sortino_ratio",sortino_ratio)
 
-        
+
         yearly_plots(returnDf)
-        
+
         mlflow.log_artifact("Visulizations/returns.png", artifact_path="Visulizations")
-        
-        
+
+
         yearlyReturns=list()
         years=range(2015,2025)
 
@@ -114,7 +200,7 @@ def objective(trial):
             returnDf_year.loc[:, 'Return'] = returnDf_year['Return'].astype(float)
             yearlyReturns.append(np.prod(1 + returnDf_year['Return']))
             mlflow.log_artifact(f"Visulizations/returns_{year}.png", artifact_path="Visulizations")
-         
+
         plt.figure(figsize=(10, 6))
         plt.plot(years, yearlyReturns, marker='o', linestyle='-', color='blue', label='Annual Returns')
 
@@ -132,23 +218,23 @@ def objective(trial):
         # Save the plot as PNG
         plt.savefig("Visulizations/annual_returns.png", dpi=300)
         plt.close()
-        
+
         mlflow.log_artifact("Visulizations/annual_returns.png", artifact_path="Visulizations")
-        
+
         TradeData.to_csv("Visulizations/TradeData.csv")
         returnDf.to_csv("Visulizations/Returns.csv")
         mlflow.log_artifact("Visulizations/TradeData.csv", artifact_path="Generated_Data")
         mlflow.log_artifact("Visulizations/Returns.csv", artifact_path="Generated_Data")
 
 
-    
 
-            
+
+
         experiment_counter += 1
-        
+
         return CumulativeReturn, SharpeRatio
 
 
 
 study = optuna.create_study(directions=["maximize","maximize"])
-study.optimize(objective, n_trials=300)
+study.optimize(objective, n_trials=3000)
