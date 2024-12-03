@@ -7,95 +7,51 @@ import numpy as np
 import mlflow
 import optuna
 
-def getLongReturns(RunDate,LongStockList,stopLoss = -0.01, holdTime=0,debug=False,numDaysToCheckStopLoss=5):
-    LongReturnList = list()
-    endDate = getDateOffset(RunDate,holdTime)
-    CloseDates=list()
-    stopLosses= list()
-    for ticker in LongStockList:
-        try:
-            putOnPrice = getPrice(RunDate,ticker,"Open")
-            firstDayLow = getPrice(RunDate,ticker,"Low")
-
-            if (firstDayLow-putOnPrice)/putOnPrice <= stopLoss:
-                Return = stopLoss
-                closeDate=RunDate
-                stopLossFlag=1
-            else:
-                Return = (getPrice(endDate,ticker,"Close")-putOnPrice)/putOnPrice
-                closeDate=endDate
-                stopLossFlag=0
-
-            LongReturnList.append(Return-0.0004)
-            CloseDates.append(closeDate)
-            stopLosses.append(stopLossFlag)
-
-        except:
-            #print("FAILED TO CALCULATE LONG RETURN:---",ticker,"--",endDate)
-            LongReturnList.append(-0.0004)
-            stopLosses.append(2)
-            CloseDates.append(endDate)
-    x = len(LongStockList)
-    return pd.DataFrame({"Stock": LongStockList,"Type":["Long"]*x, "ExecutionDate":[RunDate]*x,"CloseDate":CloseDates,"Returns":LongReturnList,"StopLoss":stopLosses})
-
-
-
-
-# In[ ]:
-
-
-def getShortReturns(RunDate,ShortStockList,holdTime=0,debug=False,stopLoss=-0.01,numDaysToCheckStopLoss=5):
-    ShortReturnList = list()
-    CloseDates=list()
-    stopLosses= list()
-
-    endDate = getDateOffset(RunDate,holdTime)
-    for ticker in ShortStockList:
-        try:
-            putOnPrice = getPrice(RunDate,ticker,"Open")
-            firstDayHigh = getPrice(RunDate,ticker,"High")
-
-            if -(firstDayHigh-putOnPrice)/putOnPrice <= stopLoss:
-                Return = stopLoss
-                closeDate=RunDate
-                stopLossFlag=1
-            else:
-                Return = -(getPrice(endDate,ticker,"Close")-putOnPrice)/putOnPrice
-                closeDate=endDate
-                stopLossFlag=0
-
-            LongReturnList.append(Return-0.0004)
-            CloseDates.append(closeDate)
-            stopLosses.append(stopLossFlag)
-
-        except:
-            #print("FAILED TO CALCULATE SHORT RETURN::---",ticker,"---",endDate)
-            ShortReturnList.append(-0.0004)
-            stopLosses.append(2)
-            CloseDates.append(endDate)
-
-
-    x = len(ShortStockList)
-    return pd.DataFrame({"Stock": ShortStockList,"Type":["Short"]*x,"ExecutionDate":[RunDate]*len(ShortStockList), "CloseDate":CloseDates,"Returns":ShortReturnList,"StopLoss":stopLosses})
-
+longFlag =1 
+shortFlag= 1
 def pick_trade(TradeData,RunDate,NumStocks,stopLoss=-0.01,holdTime=0,TimeInput=5,debug=False,numDaysToCheckStopLoss=5):
     #Calculate pct change
-
+    global longFlag
+    global shortFlag
+    
+    
+    
     PctChange = get_SortedPctChange(RunDate,TimeInput,debug=False)
-
+    
     #select first N stocks and caculate percent retruns
-    LongStockList = PctChange["Ticker"].iloc[:NumStocks]
-    LongTradeInfo = getLongReturns(RunDate,LongStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
-    #select bottom N stocks and caculate percent retruns
-    ShortStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-NumStocks:]
-    ShortTradeInfo = getShortReturns(RunDate,ShortStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
-    TotalReturn = sum(LongTradeInfo["Returns"]) / NumStocks + sum(ShortTradeInfo["Returns"]) / NumStocks
+    ShortStockList = PctChange["Ticker"].iloc[:NumStocks]
+    LongStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-NumStocks:]
+    
+    longSum=0
+    shortSum=0
+    LongTradeInfo = None
+    ShortTradeInfo = None
+    
+    if longFlag:
+        LongTradeInfo = getLongReturns(RunDate,LongStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
+        longSum = sum(LongTradeInfo["Returns"])
 
+    if shortFlag:
+        ShortTradeInfo = getShortReturns(RunDate,ShortStockList,stopLoss=stopLoss,holdTime=holdTime,debug=debug,numDaysToCheckStopLoss=5)
+        shortSum = sum(ShortTradeInfo["Returns"])
+    
+    if longSum<0 and shortSum>= 0:
+        longFlag = 1
+        shortFlag = 0
+        
+    if shortSum<0 and longSum>=0:
+        shortFlag =1
+        longFlag = 0
+
+    
+    TotalReturn = (longSum + shortSum) / NumStocks 
+    
     return TotalReturn, pd.concat([TradeData,LongTradeInfo,ShortTradeInfo])
 
 
+
 experiment_counter=0
-mlflow.set_experiment("Momentum Rider Tuning:V6")
+mlflow.set_experiment("Momentum Rider Tuning:V7")
 framedCal= get_calendar()
 
 
@@ -106,10 +62,10 @@ def objective(trial):
     with mlflow.start_run(run_name=expirement_name) as run:
         #Setup Paramter Variation
 
-        TimeInput = trial.suggest_int('TimeInput', 2, 7)
-        NumStocks= trial.suggest_int('NumStocks', 2, 10)
+        TimeInput = trial.suggest_int('TimeInput', 2, 10)
+        NumStocks= trial.suggest_int('NumStocks', 2, 30)
         holdTime=trial.suggest_int('holdTime', 0, 7)
-        stopLoss=trial.suggest_float('stopLoss',-0.05, -0.01)
+        stopLoss=trial.suggest_float('stopLoss',-0.1, -0.01)
         numDaysToCheckStopLoss= holdTime#trial.suggest_int('numDaysToCheckStopLoss', 1, holdTime)#must be less than holdtime
         TradeData=pd.DataFrame()
 
