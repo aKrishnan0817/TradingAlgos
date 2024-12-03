@@ -7,6 +7,8 @@ import pickle
 import os
 import matplotlib.pyplot as plt
 
+print(os.getcwd())
+
 def get_calendar(startDate='2014-01-01',endDate='2024-11-14'):
     nyse = mcal.get_calendar('NYSE')
     a = nyse.valid_days(start_date=startDate, end_date=endDate)
@@ -20,6 +22,11 @@ def load_data(filePath="Tools/NDX_data/NDX_2015-2014.pkl"):
         data = pickle.load(file)
     return data
 
+def getDate(date):
+        """ Takes a date in "yyyy-mm-dd" format  
+            returns a DateTime object of same date """
+        dateList= date.split('-')
+        return datetime.date(int(dateList[0]),int(dateList[1]),int(dateList[2]) )
 class Tools:
 
 
@@ -27,17 +34,13 @@ class Tools:
         self.holdTime = holdTime
         self.lookback = lookback
         self.stopLoss = stopLoss
-        self.numStock = numStocks
+        self.numStocks = numStocks
         self.data = load_data()
         self.cal= get_calendar()
 
     
     
-    def getDate(date):
-        """ Takes a date in "yyyy-mm-dd" format  
-            returns a DateTime object of same date """
-        dateList= date.split('-')
-        return datetime.date(int(dateList[0]),int(dateList[1]),int(dateList[2]) )
+    
     
     def getPrice(self,date, ticker, pos="Close"):
         """Returns Price of stock at certain date
@@ -50,7 +53,7 @@ class Tools:
         cal = self.cal
         return cal[cal.index(Date)+offset]
     
-    def get_NDXmembers(year):
+    def get_NDXmembers(self,year):
         """Since new members can be added and removed from the index
             while back testing, for each year, we must ensure we are 
             using the correct members. This extracts the members from
@@ -82,7 +85,7 @@ class Tools:
             It then sorts the list and returns a dataFrame.
         """
         
-        NDX_members = self.get_NDXmembers(self.getDate(InputDate).year)
+        NDX_members = self.get_NDXmembers(getDate(InputDate).year)
         PctChangeList = {"Ticker":[],"PctChange":[]}
         startDate = self.getDateOffset(InputDate,-self.lookback)
         endDate = self.getDateOffset(InputDate,-1)
@@ -117,7 +120,7 @@ class Tools:
             K= "High"
             s=-1
 
-        prices = list(self.ata.loc[runDate:endDate,ticker])
+        prices = list(self.data.loc[runDate:endDate,ticker])
         price = self.data.loc[runDate:endDate,ticker]
         putOnPrice= self.getPrice(runDate,ticker,"Open")
 
@@ -269,18 +272,18 @@ class Tools:
                 plt.savefig(f"Visulizations/returns_{year}.png", dpi=300, bbox_inches='tight')
                 plt.close()
 
-    def pick_trade(self,TradeData,RunDate,NumStocks):
+    def pick_trade(self,TradeData,RunDate):
         #Calculate pct change
         
-        PctChange = self.get_SortedPctChange(RunDate,self.lookback)
+        PctChange = self.get_SortedPctChange(RunDate)
         
         #select first N stocks and caculate percent retruns
-        LongStockList = PctChange["Ticker"].iloc[:NumStocks]
+        LongStockList = PctChange["Ticker"].iloc[:self.numStocks]
         LongTradeInfo = self.getLongReturns(RunDate,LongStockList)
         #select bottom N stocks and caculate percent retruns
-        ShortStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-NumStocks:]
+        ShortStockList = PctChange["Ticker"].iloc[len(PctChange["Ticker"])-self.numStocks:]
         ShortTradeInfo = self.getShortReturns(RunDate,ShortStockList)
-        TotalReturn = sum(LongTradeInfo["Returns"]) / NumStocks + sum(ShortTradeInfo["Returns"]) / NumStocks
+        TotalReturn = sum(LongTradeInfo["Returns"]) / self.numStocks + sum(ShortTradeInfo["Returns"]) / self.numStocks
         
         return TotalReturn, pd.concat([TradeData,LongTradeInfo,ShortTradeInfo])
 
